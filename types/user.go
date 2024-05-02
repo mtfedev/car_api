@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -35,7 +37,7 @@ type CreateUserParams struct {
 	Phone    string `json:"phone"`
 }
 
-func (p *CreateUserParams) ToUser() (*User, error) {
+func (p *CreateUserParams) Users() (*User, error) {
 
 	p.Email = strings.ToLower(p.Email)
 
@@ -86,4 +88,47 @@ func IsValidPassword(encpw, pw string) bool {
 func isEmailValid(e string) bool {
 	emailRegex := regexp.MustCompile(`a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
 	return emailRegex.MatchString(e)
+}
+
+type UpdateUserParams struct {
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
+	Phone   string `json:"phone"`
+}
+
+func (p *UpdateUserParams) ToBSON() bson.M {
+	b := bson.M{}
+
+	if p.Name != "" {
+		b["name"] = p.Name
+	}
+	if p.Surname != "" {
+		b["surname"] = p.Surname
+	}
+	if p.Phone != "" {
+		b["phone"] = p.Phone
+	}
+
+	return bson.M{"$set": b}
+}
+
+type UpdateUser struct {
+	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	Name              string             `bson:"name" json:"name"`
+	Surname           string             `bson:"surname" json:"surname"`
+	Email             string             `bson:"email" json:"email"`
+	EncryptedPassword string             `bson:"EncryptedPassword" json:"-"`
+}
+
+func NewUserFromParams(params CreateUserParams) (*UpdateUser, error) {
+	encpw, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcryptCost)
+	if err != nil {
+		return nil, err
+	}
+	return &UpdateUser{
+		Name:              params.Name,
+		Surname:           params.Surname,
+		Email:             params.Email,
+		EncryptedPassword: string(encpw),
+	}, nil
 }
